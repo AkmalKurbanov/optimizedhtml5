@@ -1,6 +1,5 @@
 let preprocessor = 'sass', // Preprocessor (sass, less, styl); 'sass' also work with the Scss syntax in blocks/ folder.
 	fileswatch = 'html,pug,htm,txt,json,md,woff2' // List of files extensions for watching & hard reload
-
 import pkg from 'gulp'
 const {
 	gulp,
@@ -10,6 +9,10 @@ const {
 	series,
 	watch
 } = pkg
+
+
+
+import Fs from 'fs'
 
 import browserSync from 'browser-sync'
 import bssi from 'browsersync-ssi'
@@ -28,11 +31,15 @@ import stylglob from 'gulp-noop'
 import postCss from 'gulp-postcss'
 import cssnano from 'cssnano'
 import autoprefixer from 'autoprefixer'
-import imagemin from 'gulp-imagemin'
+import imagemin from 'imagemin'
+import imageminWebp from 'imagemin-webp'
 import changed from 'gulp-changed'
 import concat from 'gulp-concat'
 import rsync from 'gulp-rsync'
 import pug from 'gulp-pug'
+import extReplace from 'gulp-ext-replace'
+
+
 
 
 import {
@@ -61,7 +68,10 @@ function browsersync() {
 
 
 function scripts() {
-	return src(['app/js/*.js', '!app/js/*.min.js'])
+	return src([
+		'app/js/*.js',
+		'!app/js/*.min.js'
+	])
 		.pipe(webpackStream({
 			mode: 'production',
 			performance: {
@@ -131,39 +141,43 @@ function styles() {
 		.pipe(browserSync.stream())
 }
 
-function images() {
-	return src(['app/images/src/**/*'])
-		.pipe(changed('app/images/dist'))
-		.pipe(imagemin())
-		.pipe(dest('app/images/dist'))
-		.pipe(browserSync.stream())
+async function images() {
+
+	await imagemin(['app/images/src/**/*.{jpg,png,svg,webp,ico}'], {
+		destination: 'app/images/dist',
+		plugins: [
+			imageminWebp({ quality: 80 })
+		]
+	})
+	browserSync.stream()
 }
 
 function buildcopy() {
 	return src([
-			'{app/js,app/css}/*.min.*',
-			'app/images/**/*.*',
-			'!app/images/src/**/*',
-			'app/fonts/**/*',
-			'app/**/*.html'
-		], {
-			base: 'app/'
-		})
+		'{app/js,app/css}/*.min.*',
+		'app/images/**/*.*',
+		'!app/images/src/**/*',
+		'app/fonts/**/*',
+		'app/**/*.html'
+	], {
+		base: 'app/'
+	})
 		.pipe(dest('dist'))
 }
 
 function pug2html() {
-	
+	let dataFromFile = JSON.parse(Fs.readFileSync('app/pug/includes/data.json'));
 	return src('app/pug/*.pug')
+
 		.pipe(
 			pug({
 				doctype: 'html',
-				pretty: true, 
+				pretty: true,
+				locals: dataFromFile || {}
 			})
 		)
 		.pipe(dest('app'))
 		.pipe(browserSync.stream());
-		
 };
 
 async function buildhtml() {
@@ -175,7 +189,7 @@ async function buildhtml() {
 }
 
 async function cleandist() {
-	await deleteAsync(['dist/**/*','app/**/*.html'], {
+	await deleteAsync(['dist/**/*', 'app/**/*.html'], {
 		force: true
 	})
 }
@@ -187,7 +201,7 @@ function deploy() {
 			hostname: 'username@yousite.com',
 			destination: 'yousite/public_html/',
 			// clean: true, // Mirror copy with file deletion
-			include: [ /* '*.htaccess' */ ], // Included files to deploy,
+			include: [ /* '*.htaccess' */], // Included files to deploy,
 			exclude: ['**/Thumbs.db', '**/*.DS_Store'],
 			recursive: true,
 			archive: true,
@@ -215,7 +229,6 @@ function startwatch() {
 }
 
 
-
 export {
 	scripts,
 	styles,
@@ -223,7 +236,7 @@ export {
 	deploy
 }
 export let assets = series(scripts, styles, images)
-export let build = series(cleandist, pug2html, buildhtml, images, scripts, styles, buildcopy)
+export let build = series(cleandist, pug2html, buildhtml, scripts, styles, images, buildcopy)
 
-export default series(scripts, styles, images, pug2html, parallel(browsersync, startwatch))
+export default series(scripts, styles, pug2html, images, parallel(browsersync, startwatch))
 
