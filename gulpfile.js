@@ -37,7 +37,7 @@ import changed from 'gulp-changed'
 import concat from 'gulp-concat'
 import rsync from 'gulp-rsync'
 import pug from 'gulp-pug'
-import extReplace from 'gulp-ext-replace'
+
 
 
 
@@ -168,7 +168,8 @@ function buildcopy() {
 function pug2html() {
 	let dataFromFile = JSON.parse(Fs.readFileSync('app/pug/includes/data.json'));
 	return src('app/pug/*.pug')
-
+		.pipe(changed('app', { extension: ['.html'] }))
+		
 		.pipe(
 			pug({
 				doctype: 'html',
@@ -179,6 +180,7 @@ function pug2html() {
 		.pipe(dest('app'))
 		.pipe(browserSync.stream());
 };
+
 
 async function buildhtml() {
 	let includes = new ssi('app/', 'dist/', '/**/*.html')
@@ -220,9 +222,13 @@ function startwatch() {
 	watch('app/images/src/**/*', {
 		usePolling: true
 	}, images)
+
+
 	watch('app/pug/**/*', {
 		usePolling: true
 	}, pug2html)
+
+	
 	watch(`app/**/*.{${fileswatch}}`, {
 		usePolling: true
 	}).on('change', browserSync.reload)
